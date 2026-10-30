@@ -1,0 +1,49 @@
+name: Prepare Minecraft Sources
+
+on:
+workflow_dispatch:
+
+permissions:
+contents: read
+
+jobs:
+sources:
+runs-on: ubuntu-latest
+
+steps:
+- name: Download repository
+uses: actions/checkout@v4
+
+- name: Install Java 25
+uses: actions/setup-java@v4
+with:
+distribution: temurin
+java-version: '25'
+
+- name: Allow Gradle execution
+run: chmod +x gradlew
+
+- name: Generate Minecraft sources
+run: ./gradlew genSources --no-daemon --no-configuration-cache "-Dorg.gradle.jvmargs=-Xmx2G"
+
+- name: Collect Minecraft sources
+shell: bash
+run: |
+mkdir -p minecraft-sources
+for directory in "$HOME/.gradle/caches/fabric-loom" "$GITHUB_WORKSPACE/.gradle"; do
+if [ -d "$directory" ]; then
+find "$directory" -type f -name '*sources*.jar' \
+-exec cp --backup=numbered {} minecraft-sources/ \;
+fi
+done
+if ! find minecraft-sources -type f | grep -q .; then
+echo "No sources JAR found."
+exit 1
+fi
+
+- name: Upload sources
+uses: actions/upload-artifact@v4
+with:
+name: minecraft-sources
+path: minecraft-sources/
+retention-days: 3
